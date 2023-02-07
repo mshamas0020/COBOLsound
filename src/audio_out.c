@@ -4,6 +4,7 @@
 
 #include "SDL2/SDL.h"
 #include <stdio.h>
+#include <time.h>
 
 // format globals
 static Uint32 BUFFER_SIZE;
@@ -80,6 +81,17 @@ void audio_close() {
     printf("Playback finished.");
 }
 
+/*
+static clock_t lastClock;
+void test_clock() {
+    if (!lastClock) {
+        lastClock = clock();
+        return;
+    }
+
+    printf("CLOCK: %f ms\n", (double) (clock() - lastClock) * 1000 / CLOCKS_PER_SEC);
+    lastClock = clock();
+}*/
 
 
 // main

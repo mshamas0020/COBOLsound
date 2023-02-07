@@ -2,7 +2,7 @@
       * COBOLsound.cbl
       * 
       * Input a MIDI track and get playback with simple oscillators.
-      * Execute from the console with:
+      * Execute from the command line with:
       *
       * C:...> COBOLsound.exe MIDI-file waveform
       *
@@ -28,6 +28,7 @@
        >> define constant ENV-RELEASE-MS   as 20
 
        >> define constant MAX-OSCILLATORS  as 32
+       >> define constant WAVETABLE-AMP    as 0.125
        >> define constant WAVETABLE-SIZE   as 1024
       
        
@@ -108,7 +109,7 @@
        *>  OSCILLATORS
 
        *>  gnuCOBOL's implementation of float arithmetic has very poor performance
-       *>  instead, using a long where 0x00010000 is equivalent to 1 is much less expensive
+       *>  instead, using a long where 0x8000 is equivalent to 1 is much less expensive
        01  OUT-RANGE           CONSTANT AS 32768.
        01  osc.
            02  osc-item        occurs MAX-OSCILLATORS times
@@ -185,7 +186,7 @@
            accept cmd-line from command-line
 
            *> compute values
-           compute wt-amplitude = (OUT-RANGE - 1) / 16
+           compute wt-amplitude = (OUT-RANGE - 1) * WAVETABLE-AMP
            compute env-attack-inc = 1000 / ENV-ATTACK-MS / SAMPLE-RATE * (OUT-RANGE - 1)
            compute env-release-dec = 1000 / ENV-RELEASE-MS / SAMPLE-RATE * (OUT-RANGE - 1)
            compute osc-phase-range = WAVETABLE-SIZE *  OUT-RANGE
@@ -247,7 +248,7 @@
        INIT-MAKE-WAVETABLE.
 
            *> sin2
-           *> Bhaskara I's sine approximation formula
+           *> Bhaskara I's approximation
            if wt-type = 'sin2' then 
                perform varying i from 1 by 1 until i > WAVETABLE-SIZE
                    compute wt-x = 360 * i / WAVETABLE-SIZE
@@ -268,7 +269,6 @@
                perform varying i from 1 by 1 until i > WAVETABLE-SIZE
                    compute wt-x = TWO-PI * (0.5 - i / WAVETABLE-SIZE)
                    compute wt-item(i) = (wt-x - wt-x ** 3 / 6 + wt-x ** 5 / 120 - wt-x ** 7 / 5040 + wt-x ** 9 / 362880) * wt-amplitude
-                   display wt-item(i) ' ' wt-x
                end-perform
                exit paragraph
            end-if
@@ -363,7 +363,7 @@
            *> <length> - should always be 6 bytes
            perform READ-WORD
            if not read-item(4) = 6
-               move 'MIDI file has invalid header length.' to error-message
+               move 'MIDI file has abnormal header length.' to error-message
                perform ERROR-ESCAPE
            end-if
       
@@ -373,7 +373,7 @@
            *>  display 'WARNING: Multi-track rendering is not supported.'
            *>  display 'Tracks will be rendered sequentially.'
            *> end-if
-           *> ^ many MIDI files begin with a track containing meta-data and no-ticks, so this warning is overused
+           *> ^ many MIDI files begin with a separate track containing only meta-data and no ticks, so this warning is overused
 
            *> <time format>
            perform READ-HALFWORD
@@ -682,11 +682,6 @@
                    compute osc-output(i) = wt-output * osc-envelope(i) / OUT-RANGE * osc-velocity(i) / OUT-RANGE
                end-if
            end-perform
-
-           *> if reading and rendering is done, request to exit main loop
-           if (in-eof = 1 and osc-active = 0) then 
-               set main-exit to 1
-           end-if
            exit paragraph.
 
 
@@ -737,6 +732,11 @@
            *> add buffer to SDL audio queue
            call "audio_queue" using
                by reference buff
+
+           *> if reading and rendering is done, request to exit main loop
+           if (in-eof = 1 and osc-active = 0) then 
+               set main-exit to 1
+           end-if
 
            exit paragraph.
 
